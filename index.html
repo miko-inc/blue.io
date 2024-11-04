@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Bluetooth to Google Sheets</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px 0; }
+        #status { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>BluetoothデータをGoogleスプレッドシートに送信</h1>
+    <button id="connectButton">Bluetooth接続</button>
+    <button id="sendButton" disabled>スプレッドシートに送信</button>
+    <div id="status"></div>
+
+    <script>
+        const connectButton = document.getElementById('connectButton');
+        const sendButton = document.getElementById('sendButton');
+        const statusDiv = document.getElementById('status');
+
+        let receivedData = '';
+
+        // サービスUUIDとキャラクタリスティックUUIDを小文字に変更
+        const SERVICE_UUID = '00010000-0000-1000-8000-011f2000046d'; // サービスUUID（小文字）
+        const CHARACTERISTIC_UUID = 'fbe6317d-4380-84be-2ef5-e2cd2b585cfa'; // キャラクタリスティックUUID（小文字）
+
+        // Bluetoothデバイスに接続
+        connectButton.addEventListener('click', async () => {
+            try {
+                // 一時的にacceptAllDevicesをtrueに設定してデバイスが表示されるか確認
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true, // フィルターを緩和
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                // GATTサーバーに接続
+                const server = await device.gatt.connect();
+
+                // 指定したサービスを取得
+                const service = await server.getPrimaryService(SERVICE_UUID);
+
+                // 指定したキャラクタリスティックを取得
+                const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+                // 通知を開始
+                await characteristic.startNotifications();
+
+                // データ受信時のイベントリスナーを追加
+                characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
+
+                statusDiv.textContent = 'Bluetoothに接続しました。データを待っています...';
+                sendButton.disabled = false;
+            } catch (error) {
+                console.error('Bluetooth接続エラー:', error);
+                statusDiv.textContent = 'Bluetooth接続エラー: ' + error;
+            }
+        });
+
+        // データ受信時のハンドラー
+        function handleCharacteristicValueChanged(event) {
+            const value = event.target.value;
+            const decoder = new TextDecoder('utf-8');
+            const text = decoder.decode(value);
+            receivedData += text;
+            statusDiv.textContent = '受信データ: ' + receivedData;
+            console.log('受信データ:', receivedData);
+        }
+
+        // データをスプレッドシートに送信
+        sendButton.addEventListener('click', async () => {
+            if (!receivedData) {
+                alert('送信するデータがありません。');
+                return;
+            }
+
+            try {
+                const response = await fetch('https://script.google.com/macros/s/AKfycbyfO5ULhqxd_r-1I2PsRKLKdy-AU6W9L6YLSwViPJxYnQZ7bzYIXberfVaclyaROxD6/exec', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: receivedData })
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    statusDiv.textContent = 'データをスプレッドシートに送信しました。';
+                    receivedData = ''; // 送信後にデータをクリア
+                } else {
+                    statusDiv.textContent = 'データ送信エラー: ' + result.message;
+                }
+            } catch (error) {
+                console.error('送信エラー:', error);
+                statusDiv.textContent = '送信エラー: ' + error;
+            }
+        });
+    </script>
+</body>
+</html>
