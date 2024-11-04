@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>キーボード入力をGoogleスプレッドシートに送信</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            max-width: 800px; 
+            margin: auto;
+        }
+        button { 
+            padding: 10px 20px; 
+            margin: 10px 5px 10px 0; 
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #status { 
+            margin-top: 20px; 
+            font-weight: bold;
+        }
+        #inputData { 
+            width: 100%; 
+            padding: 10px; 
+            margin-top: 10px; 
+            box-sizing: border-box;
+            font-size: 16px;
+            resize: vertical;
+        }
+        #preview {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+            white-space: pre-wrap; /* 改行を反映 */
+            word-wrap: break-word;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h1>キーボード入力をGoogleスプレッドシートに送信</h1>
+
+    <div class="section">
+        <label for="inputData"><strong>入力内容:</strong></label><br>
+        <textarea id="inputData" rows="5" placeholder="ここに入力してください"></textarea>
+    </div>
+
+    <div class="section">
+        <strong>入力内容のプレビュー:</strong>
+        <div id="preview">ここに入力した内容が表示されます。</div>
+    </div>
+
+    <button id="sendButton">スプレッドシートに送信</button>
+    <button id="clearButton">クリア</button>
+    <div id="status"></div>
+
+    <script>
+        const sendButton = document.getElementById('sendButton');
+        const clearButton = document.getElementById('clearButton');
+        const statusDiv = document.getElementById('status');
+        const inputData = document.getElementById('inputData');
+        const previewDiv = document.getElementById('preview');
+
+        // テキストエリアの入力イベントを監視し、プレビューを更新
+        inputData.addEventListener('input', () => {
+            const data = inputData.value.trim();
+            previewDiv.textContent = data ? data : 'ここに入力した内容が表示されます。';
+        });
+
+        // データをスプレッドシートに送信
+        sendButton.addEventListener('click', async () => {
+            const data = inputData.value.trim();
+            if (!data) {
+                alert('送信するデータがありません。');
+                return;
+            }
+
+            try {
+                const response = await fetch('https://script.google.com/macros/s/AKfycbyfO5ULhqxd_r-1I2PsRKLKdy-AU6W9L6YLSwViPJxYnQZ7bzYIXberfVaclyaROxD6/exec', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: data })
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    statusDiv.textContent = 'データをスプレッドシートに送信しました。';
+                    inputData.value = ''; // 送信後に入力フィールドをクリア
+                    previewDiv.textContent = 'ここに入力した内容が表示されます。';
+                } else {
+                    statusDiv.textContent = 'データ送信エラー: ' + result.message;
+                    statusDiv.style.color = 'red';
+                }
+            } catch (error) {
+                console.error('送信エラー:', error);
+                statusDiv.textContent = '送信エラー: ' + error;
+                statusDiv.style.color = 'red';
+            }
+        });
+
+        // クリアボタンの機能を追加
+        clearButton.addEventListener('click', () => {
+            if (confirm('本当にクリアしますか？')) {
+                inputData.value = ''; // テキストエリアをクリア
+                previewDiv.textContent = 'ここに入力した内容が表示されます。'; // プレビューをリセット
+                statusDiv.textContent = ''; // ステータスメッセージをクリア
+                statusDiv.style.color = 'black'; // ステータスメッセージの色をリセット
+            }
+        });
+    </script>
+</body>
+</html>
